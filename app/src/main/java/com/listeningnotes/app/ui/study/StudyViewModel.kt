@@ -13,7 +13,13 @@ import com.listeningnotes.app.data.model.Vocab
 import com.listeningnotes.app.data.model.Segment
 import com.listeningnotes.app.data.model.Transcription
 import com.listeningnotes.app.export.ExportSegment
+import com.listeningnotes.app.export.PdfData
+import com.listeningnotes.app.export.PdfExporter
+import com.listeningnotes.app.export.PdfMode
+import com.listeningnotes.app.export.PdfSegment
 import com.listeningnotes.app.export.SegmentExporter
+import java.io.OutputStream
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -51,6 +57,13 @@ sealed interface StudyUiState {
         val shadowing: Boolean,
         val shadowPauseIndex: Int,
     ) : StudyUiState
+}
+
+/** Formatos de exportación de la transcripción. */
+enum class ExportFormat(val label: String, val mime: String, val extension: String) {
+    TXT("Texto (.txt)", "text/plain", "txt"),
+    PDF_TIEMPOS("PDF con tiempos", "application/pdf", "pdf"),
+    PDF_TEXTO("PDF solo texto", "application/pdf", "pdf"),
 }
 
 private data class StudyPrefs(
@@ -234,21 +247,41 @@ class StudyViewModel(private val container: AppContainer, private val transcript
         null
     }
 
-    /** Nombre de fichero sugerido para "Guardar". */
-    fun suggestedFileName(): String {
-        val title = (uiState.value as? StudyUiState.Content)?.transcription?.titulo ?: "transcripcion"
-        return SegmentExporter.suggestedFileName(title)
+    /** Escribe la transcripción en [out] en el [format] pedido (TXT o PDF). */
+    private suspend fun writeExport(format: ExportFormat, out: OutputStream) {
+        val t = repository.getTranscription(transcriptionId) ?: error("La transcripción ya no existe")
+        when (format) {
+            ExportFormat.TXT -> {
+                val text = exportText() ?: error("La transcripción ya no existe")
+                withContext(Dispatchers.IO) { out.write(text.toByteArray(Charsets.UTF_8)) }
+            }
+            ExportFormat.PDF_TIEMPOS, ExportFormat.PDF_TEXTO -> {
+                val segments = repository.getSegments(transcriptionId)
+                    .map { PdfSegment(it.inicioMs, it.finMs, it.texto, it.favorita) }
+                val vocabulary = container.vocabulary.observeAll().first()
+                    .filter { it.transcriptionId == transcriptionId }
+                    .map { it.palabra to it.nota }
+                val data = PdfData(t.titulo, t.duracionMs, t.fecha, t.modelo, segments, vocabulary)
+                val mode = if (format == ExportFormat.PDF_TIEMPOS) PdfMode.CON_TIEMPOS else PdfMode.SOLO_TEXTO
+                withContext(Dispatchers.Default) { PdfExporter.write(out, data, mode) }
+            }
+        }
     }
 
-    /** Escribe el .txt en el documento elegido por el usuario (CreateDocument). */
-    fun saveTo(uri: Uri) {
+    /** Nombre de fichero sugerido para "Guardar". */
+    fun suggestedFileName(format: ExportFormat): String {
+        val title = (uiState.value as? StudyUiState.Content)?.transcription?.titulo ?: "transcripcion"
+        val suffix = if (format == ExportFormat.PDF_TEXTO) " (solo texto)" else ""
+        return SegmentExporter.suggestedFileName(title + suffix, format.extension)
+    }
+
+    /** Escribe el fichero en el documento elegido por el usuario (CreateDocument). */
+    fun saveTo(uri: Uri, format: ExportFormat) {
         viewModelScope.launch {
             try {
-                val text = exportText() ?: error("La transcripción ya no existe")
-                withContext(Dispatchers.IO) {
-                    container.appContext.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
-                        ?: error("No se pudo abrir el destino")
-                }
+                val stream = withContext(Dispatchers.IO) { container.appContext.contentResolver.openOutputStream(uri) }
+                    ?: error("No se pudo abrir el destino")
+                stream.use { writeExport(format, it) }
                 _messages.trySend("Guardado")
             } catch (e: Exception) {
                 _messages.trySend("No se pudo guardar el archivo: ${e.message}")
@@ -256,15 +289,12 @@ class StudyViewModel(private val container: AppContainer, private val transcript
         }
     }
 
-    /** Crea el .txt en la caché y devuelve un content:// seguro (FileProvider) para compartirlo. */
-    suspend fun createShareUri(context: Context): Uri? = try {
-        val text = exportText() ?: error("La transcripción ya no existe")
-        withContext(Dispatchers.IO) {
-            val dir = File(context.cacheDir, "exports").apply { mkdirs() }
-            val file = File(dir, suggestedFileName())
-            file.writeText(text, Charsets.UTF_8)
-            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        }
+    /** Crea el fichero en la caché y devuelve un content:// seguro (FileProvider) para compartirlo. */
+    suspend fun createShareUri(context: Context, format: ExportFormat): Uri? = try {
+        val dir = withContext(Dispatchers.IO) { File(context.cacheDir, "exports").apply { mkdirs() } }
+        val file = File(dir, suggestedFileName(format))
+        file.outputStream().use { writeExport(format, it) }
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
     } catch (e: Exception) {
         _messages.trySend("No se pudo preparar el archivo: ${e.message}")
         null

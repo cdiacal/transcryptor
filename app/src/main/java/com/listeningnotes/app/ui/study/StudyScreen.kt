@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Share
@@ -84,6 +85,7 @@ import com.listeningnotes.app.ui.common.FilaPestanas
 import com.listeningnotes.app.ui.common.IconoCabecera
 import com.listeningnotes.app.ui.common.TarjetaPanel
 import com.listeningnotes.app.ui.common.TextoDialog
+import com.listeningnotes.app.ui.common.BotonPrincipal
 import com.listeningnotes.app.ui.common.BotonSecundario
 import com.listeningnotes.app.ui.common.abrirUrl
 import com.listeningnotes.app.ui.common.urlDiccionario
@@ -114,8 +116,13 @@ fun StudyScreen(viewModel: StudyViewModel, onBack: () -> Unit) {
     // Al salir de la pantalla dejamos de reproducir.
     DisposableEffect(Unit) { onDispose { viewModel.pause() } }
 
-    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
-        if (uri != null) viewModel.saveTo(uri)
+    var exportFormat by remember { mutableStateOf(ExportFormat.PDF_TIEMPOS) }
+    var showExport by remember { mutableStateOf(false) }
+    val saveTxt = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        if (uri != null) viewModel.saveTo(uri, ExportFormat.TXT)
+    }
+    val savePdf = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+        if (uri != null) viewModel.saveTo(uri, exportFormat)
     }
 
     val content = state as? StudyUiState.Content
@@ -141,20 +148,7 @@ fun StudyScreen(viewModel: StudyViewModel, onBack: () -> Unit) {
                                 }
                             }
                         }
-                        IconoCabecera(Icons.Filled.Share, "Compartir como .txt") {
-                            scope.launch {
-                                val uri = viewModel.createShareUri(context) ?: return@launch
-                                val send = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_STREAM, uri)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                }
-                                context.startActivity(Intent.createChooser(send, "Compartir transcripción"))
-                            }
-                        }
-                        IconoCabecera(Icons.Filled.Save, "Guardar como .txt") {
-                            saveLauncher.launch(viewModel.suggestedFileName())
-                        }
+                        IconoCabecera(Icons.Filled.PictureAsPdf, "Exportar") { showExport = true }
                     }
                 },
             )
@@ -169,6 +163,31 @@ fun StudyScreen(viewModel: StudyViewModel, onBack: () -> Unit) {
                 is StudyUiState.Content -> StudyContent(s, viewModel, onLongPress = { actionsFor = it })
             }
         }
+    }
+
+    if (showExport) {
+        ExportDialog(
+            selected = exportFormat,
+            onSelect = { exportFormat = it },
+            onShare = {
+                showExport = false
+                scope.launch {
+                    val uri = viewModel.createShareUri(context, exportFormat) ?: return@launch
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = exportFormat.mime
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(Intent.createChooser(send, "Compartir transcripción"))
+                }
+            },
+            onSave = {
+                showExport = false
+                val name = viewModel.suggestedFileName(exportFormat)
+                if (exportFormat == ExportFormat.TXT) saveTxt.launch(name) else savePdf.launch(name)
+            },
+            onDismiss = { showExport = false },
+        )
     }
 
     actionsFor?.let { seg ->
@@ -472,5 +491,38 @@ private fun WordDialog(
         },
         confirmButton = { TextButton(onClick = { onSave(note) }) { Text("Guardar") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+    )
+}
+
+@Composable
+private fun ExportDialog(
+    selected: ExportFormat,
+    onSelect: (ExportFormat) -> Unit,
+    onShare: () -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val formats = ExportFormat.entries
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Exportar transcripción") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                FilaPestanas(formats.map { it.label }, formats.indexOf(selected), { onSelect(formats[it]) })
+                Text(
+                    when (selected) {
+                        ExportFormat.TXT -> "Una línea por frase con su marca de tiempo."
+                        ExportFormat.PDF_TIEMPOS -> "Una tarjeta por frase con su marca [mm:ss] y las favoritas con estrella."
+                        ExportFormat.PDF_TEXTO -> "Todo el texto seguido, en párrafos y sin tiempos."
+                    },
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    BotonPrincipal("Compartir", onShare, Modifier.weight(1f))
+                    BotonSecundario("Guardar", onSave, Modifier.weight(1f))
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } },
     )
 }

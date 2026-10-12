@@ -29,9 +29,9 @@ object SegmentExporter {
         }
     }
 
-    /** Nombre de fichero seguro para el título (`.txt`). */
-    fun suggestedFileName(title: String): String {
+    /** Nombre de fichero seguro para el título (por defecto `.txt`). */
+    fun suggestedFileName(title: String, extension: String = "txt"): String {
         val cleaned = title.replace(Regex("[\\\\/:*?\"<>|\\r\\n\\t]"), "_").trim().take(80)
-        return (cleaned.ifEmpty { "transcripcion" }) + ".txt"
+        return (cleaned.ifEmpty { "transcripcion" }) + "." + extension
     }
 }

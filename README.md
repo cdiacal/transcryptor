@@ -19,6 +19,9 @@ Usa siempre `colorIngreso()`, `colorGasto()` y `colorAviso()` para los colores s
 - **Transcripción** con whisper.cpp (JNI/NDK, solo `arm64-v8a`), progreso en vivo, botón cancelar, pantalla siempre
   encendida y servicio en primer plano con notificación si el audio dura más de 2 minutos.
 - **Resultado**: frases con marca `[mm:ss]`, edición con pulsación larga, copiar todo, compartir/guardar como `.txt`.
+- **Exportar**: botón en el modo estudio con tres formatos, compartir o guardar: texto `.txt`, **PDF con tiempos** (una
+  tarjeta por frase con `[mm:ss]`, favoritas con estrella) y **PDF solo texto** (párrafos sin tiempos). Ambos PDF incluyen
+  el vocabulario guardado del audio. Plantilla de ejemplo en `docs/plantilla-pdf-ejemplo.pdf`.
 - **Biblioteca** (Room): búsqueda en títulos y frases, renombrar y borrar.
 - **Modo estudio**: reproductor con barra de progreso, tocar una frase la reproduce de `inicioMs` a `finMs`,
   «Repetir frase», velocidad 0.75x/1x/1.25x, «Ocultar texto» (difuminado + ojo por frase), favoritas (estrella) y
