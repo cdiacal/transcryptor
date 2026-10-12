@@ -66,7 +66,7 @@ class TranscriptionManager(
     fun start(uri: Uri) {
         if (isRunning) return
         _state.value = JobState.Running(Stage.IMPORTING, null, "")
-        job = scope.launch { run(uri) }
+        job = scope.launch { execute(uri) }
     }
 
     fun cancel() {
@@ -79,7 +79,7 @@ class TranscriptionManager(
         if (_state.value !is JobState.Running) _state.value = JobState.Idle
     }
 
-    private suspend fun run(uri: Uri) {
+    private suspend fun execute(uri: Uri) {
         var imported: File? = null
         var saved = false
         try {

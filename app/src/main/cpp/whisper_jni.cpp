@@ -107,7 +107,6 @@ Java_com_listeningnotes_app_whisper_WhisperNative_transcribe(
         jint threads, jobject listener) {
     Handle *handle = toHandle(ptr);
     if (handle == nullptr || handle->ctx == nullptr) return -100;
-    handle->cancel.store(false);
 
     // El array puede ser más grande que el audio real: usamos solo nSamples.
     const jsize n = std::min(nSamples, env->GetArrayLength(samples));
