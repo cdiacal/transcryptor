@@ -34,6 +34,10 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch { container.settings.setThreads(n) }
     }
 
+    fun setSplitSentences(value: Boolean) {
+        viewModelScope.launch { container.settings.setSplitSentences(value) }
+    }
+
     fun setTheme(mode: ThemeMode) {
         viewModelScope.launch { container.settings.setTheme(mode) }
     }

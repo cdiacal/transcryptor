@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
@@ -76,6 +77,7 @@ fun LibraryScreen(
     onNew: () -> Unit,
     onOpen: (Long) -> Unit,
     onSettings: () -> Unit,
+    onVocab: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
@@ -98,6 +100,7 @@ fun LibraryScreen(
                         "Biblioteca", Modifier.weight(1f), color = androidx.compose.ui.graphics.Color.White,
                         fontSize = 20.sp, fontWeight = FontWeight.Bold,
                     )
+                    IconoCabecera(Icons.Filled.Book, "Vocabulario", onVocab)
                     IconoCabecera(Icons.Filled.Settings, "Ajustes", onSettings)
                 }
                 Spacer(Modifier.size(14.dp))

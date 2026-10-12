@@ -3,6 +3,7 @@ package com.listeningnotes.app.data.repository
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -24,6 +25,8 @@ data class AppSettings(
     val modelId: String = DEFAULT_MODEL_ID,
     val threads: Int = defaultThreads(),
     val theme: ThemeMode = ThemeMode.SYSTEM,
+    /** Divide los segmentos de whisper en frases más cortas al transcribir. */
+    val splitSentences: Boolean = true,
 ) {
     companion object {
         fun maxThreads(): Int = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
@@ -39,6 +42,7 @@ class SettingsRepository(private val context: Context) {
         val MODEL = stringPreferencesKey("model_id")
         val THREADS = intPreferencesKey("threads")
         val THEME = stringPreferencesKey("theme")
+        val SPLIT = booleanPreferencesKey("split_sentences")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data
@@ -48,6 +52,7 @@ class SettingsRepository(private val context: Context) {
                 modelId = p[Keys.MODEL] ?: DEFAULT_MODEL_ID,
                 threads = (p[Keys.THREADS] ?: AppSettings.defaultThreads()).coerceIn(1, AppSettings.maxThreads()),
                 theme = p[Keys.THEME]?.let { name -> ThemeMode.entries.firstOrNull { it.name == name } } ?: ThemeMode.SYSTEM,
+                splitSentences = p[Keys.SPLIT] ?: true,
             )
         }
 
@@ -56,4 +61,5 @@ class SettingsRepository(private val context: Context) {
     suspend fun setModel(id: String) = context.dataStore.edit { it[Keys.MODEL] = id }
     suspend fun setThreads(n: Int) = context.dataStore.edit { it[Keys.THREADS] = n }
     suspend fun setTheme(mode: ThemeMode) = context.dataStore.edit { it[Keys.THEME] = mode.name }
+    suspend fun setSplitSentences(value: Boolean) = context.dataStore.edit { it[Keys.SPLIT] = value }
 }

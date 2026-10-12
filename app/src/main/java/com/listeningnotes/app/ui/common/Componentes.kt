@@ -275,3 +275,46 @@ fun BarraProgreso(progress: Float?, modifier: Modifier = Modifier) {
         LinearProgressIndicator(modifier = modifier.fillMaxWidth(), trackColor = track, strokeCap = StrokeCap.Round)
     }
 }
+
+/** Abre una URL en el navegador (no requiere permiso de Internet en la app). */
+fun abrirUrl(context: android.content.Context, url: String) {
+    try {
+        context.startActivity(
+            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    } catch (e: android.content.ActivityNotFoundException) {
+        android.widget.Toast.makeText(context, "No hay ningún navegador disponible", android.widget.Toast.LENGTH_SHORT).show()
+    }
+}
+
+fun urlDiccionario(palabra: String): String =
+    "https://www.wordreference.com/enes/" + java.net.URLEncoder.encode(palabra, "UTF-8").replace("+", "%20")
+
+fun urlTraductor(texto: String): String =
+    "https://translate.google.com/?sl=en&tl=es&op=translate&text=" + java.net.URLEncoder.encode(texto, "UTF-8")
+
+/** Diálogo con un campo de texto (notas, ediciones). */
+@Composable
+fun TextoDialog(
+    titulo: String,
+    inicial: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+    etiqueta: String? = null,
+    minLines: Int = 1,
+) {
+    var text by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(inicial) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(titulo) },
+        text = {
+            androidx.compose.material3.OutlinedTextField(
+                text, { text = it }, Modifier.fillMaxWidth(),
+                label = etiqueta?.let { { Text(it) } }, minLines = minLines,
+            )
+        },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = { onConfirm(text) }) { Text("Guardar") } },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancelar") } },
+    )
+}

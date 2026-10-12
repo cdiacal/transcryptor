@@ -6,9 +6,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** Segmento crudo devuelto por whisper (tiempos en ms). */
-data class RawSegment(val startMs: Long, val endMs: Long, val text: String)
-
 class WhisperException(message: String) : Exception(message)
 
 /**

@@ -106,6 +106,20 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
             }
 
             TarjetaPanel(Modifier.fillMaxWidth()) {
+                SectionTitle("Frases")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Dividir en frases cortas", Modifier.weight(1f), fontSize = 14.sp)
+                    androidx.compose.material3.Switch(settings.splitSentences, viewModel::setSplitSentences)
+                }
+                Text(
+                    "Whisper a veces junta varias frases en una. Al activarlo, las transcripciones nuevas se parten por la " +
+                        "puntuación para que repetir una frase sea más preciso. Los tiempos se reparten según la longitud.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            TarjetaPanel(Modifier.fillMaxWidth()) {
                 SectionTitle("Tema")
                 val modos = ThemeMode.entries
                 FilaPestanas(

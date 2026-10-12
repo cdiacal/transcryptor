@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.listeningnotes.app.AppContainer
 import com.listeningnotes.app.audio.PlayerUiState
 import com.listeningnotes.app.audio.StudyPlayer
+import com.listeningnotes.app.audio.Tramo
+import com.listeningnotes.app.data.model.Vocab
 import com.listeningnotes.app.data.model.Segment
 import com.listeningnotes.app.data.model.Transcription
 import com.listeningnotes.app.export.ExportSegment
@@ -46,6 +48,8 @@ sealed interface StudyUiState {
         val loop: Boolean,
         val favoritesOnly: Boolean,
         val audioAvailable: Boolean,
+        val shadowing: Boolean,
+        val shadowPauseIndex: Int,
     ) : StudyUiState
 }
 
@@ -54,7 +58,13 @@ private data class StudyPrefs(
     val revealed: Set<Long> = emptySet(),
     val loop: Boolean = false,
     val favoritesOnly: Boolean = false,
+    val shadowing: Boolean = false,
+    val shadowPauseIndex: Int = 1,
 )
+
+/** Opciones de pausa del shadowing: milisegundos (-1 = igual a la duración de la frase). */
+val SHADOW_PAUSES_MS = listOf(1_000L, 2_000L, 4_000L, -1L)
+val SHADOW_PAUSE_LABELS = listOf("1 s", "2 s", "4 s", "= frase")
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class StudyViewModel(private val container: AppContainer, private val transcriptionId: Long) : ViewModel() {
@@ -66,6 +76,11 @@ class StudyViewModel(private val container: AppContainer, private val transcript
     private val retry = MutableStateFlow(0)
 
     val playerState: StateFlow<PlayerUiState> = player.state
+
+    /** Palabras ya guardadas, por clave normalizada. */
+    val savedWords: StateFlow<Map<String, Vocab>> = container.vocabulary.observeAll()
+        .map { list -> list.associateBy { it.palabra } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     private val _messages = Channel<String>(Channel.BUFFERED)
     val messages = _messages.receiveAsFlow()
@@ -91,12 +106,20 @@ class StudyViewModel(private val container: AppContainer, private val transcript
                     loop = p.loop,
                     favoritesOnly = p.favoritesOnly,
                     audioAvailable = audio,
+                    shadowing = p.shadowing,
+                    shadowPauseIndex = p.shadowPauseIndex,
                 ) as StudyUiState
             }
         }.catch { emit(StudyUiState.Error(it.message ?: "No se pudo cargar la transcripción")) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StudyUiState.Loading)
 
     init {
+        // Siguiente frase visible (respeta el filtro de favoritas) para el modo shadowing.
+        player.nextTramo = { id ->
+            val list = (uiState.value as? StudyUiState.Content)?.segments.orEmpty()
+            val i = list.indexOfFirst { it.id == id }
+            if (i >= 0) list.getOrNull(i + 1)?.let { Tramo(it.id, it.inicioMs, it.finMs) } else null
+        }
         viewModelScope.launch {
             val t = try {
                 repository.getTranscription(transcriptionId)
@@ -118,12 +141,46 @@ class StudyViewModel(private val container: AppContainer, private val transcript
     fun pause() = player.pause()
 
     fun onSegmentClick(segment: Segment) {
-        if (audioAvailable.value) player.playSegment(segment.inicioMs, segment.finMs)
+        if (audioAvailable.value) player.playSegment(Tramo(segment.id, segment.inicioMs, segment.finMs))
     }
 
     fun setLoop(enabled: Boolean) {
         prefs.update { it.copy(loop = enabled) }
         player.setLoop(enabled)
+    }
+
+    fun setShadowing(enabled: Boolean) {
+        prefs.update { it.copy(shadowing = enabled) }
+        player.setShadowing(enabled, SHADOW_PAUSES_MS[prefs.value.shadowPauseIndex])
+    }
+
+    fun setShadowPause(index: Int) {
+        prefs.update { it.copy(shadowPauseIndex = index) }
+        player.setShadowing(prefs.value.shadowing, SHADOW_PAUSES_MS[index])
+    }
+
+    // --- Vocabulario ---
+
+    fun saveWord(word: String, note: String, segment: Segment) {
+        val title = (uiState.value as? StudyUiState.Content)?.transcription?.titulo ?: ""
+        viewModelScope.launch {
+            try {
+                container.vocabulary.save(word, note, segment.texto, segment.transcriptionId, segment.inicioMs, title)
+                _messages.trySend("Palabra guardada")
+            } catch (e: Exception) {
+                _messages.trySend("No se pudo guardar la palabra: ${e.message}")
+            }
+        }
+    }
+
+    fun removeWord(word: String) {
+        viewModelScope.launch {
+            try {
+                container.vocabulary.remove(word)
+            } catch (e: Exception) {
+                _messages.trySend("No se pudo quitar la palabra: ${e.message}")
+            }
+        }
     }
 
     // --- Modo listening y favoritas ---

@@ -12,6 +12,7 @@ import com.listeningnotes.app.data.repository.SettingsRepository
 import com.listeningnotes.app.data.repository.TranscriptionRepository
 import com.listeningnotes.app.whisper.ModelManager
 import com.listeningnotes.app.whisper.Models
+import com.listeningnotes.app.whisper.SentenceSplitter
 import com.listeningnotes.app.whisper.WhisperEngine
 import com.listeningnotes.app.whisper.WhisperException
 import kotlinx.coroutines.CancellationException
@@ -110,8 +111,9 @@ class TranscriptionManager(
                 _state.value = JobState.Running(Stage.TRANSCRIBING, percent / 100f, title)
             }
             if (segments.isEmpty()) throw UserFacingError("No se detectó voz en el audio.")
+            val finalSegments = if (cfg.splitSentences) segments.flatMap { SentenceSplitter.split(it) } else segments
 
-            val id = repository.save(title, audio.file.absolutePath, decoded.durationMs, spec.id, segments)
+            val id = repository.save(title, audio.file.absolutePath, decoded.durationMs, spec.id, finalSegments)
             saved = true
             _state.value = JobState.Done(id)
         } catch (e: CancellationException) {

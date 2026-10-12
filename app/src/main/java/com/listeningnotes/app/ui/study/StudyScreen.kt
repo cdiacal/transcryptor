@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 
 package com.listeningnotes.app.ui.study
 
@@ -11,7 +11,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -78,6 +83,16 @@ import com.listeningnotes.app.ui.common.CabeceraSimple
 import com.listeningnotes.app.ui.common.FilaPestanas
 import com.listeningnotes.app.ui.common.IconoCabecera
 import com.listeningnotes.app.ui.common.TarjetaPanel
+import com.listeningnotes.app.ui.common.TextoDialog
+import com.listeningnotes.app.ui.common.BotonSecundario
+import com.listeningnotes.app.ui.common.abrirUrl
+import com.listeningnotes.app.ui.common.urlDiccionario
+import com.listeningnotes.app.ui.common.urlTraductor
+import com.listeningnotes.app.data.model.Vocab
+import com.listeningnotes.app.util.normalizeWord
+import com.listeningnotes.app.util.splitTokens
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import com.listeningnotes.app.ui.theme.colorAviso
 import com.listeningnotes.app.ui.common.ErrorState
 import com.listeningnotes.app.ui.common.LoadingState
@@ -104,7 +119,9 @@ fun StudyScreen(viewModel: StudyViewModel, onBack: () -> Unit) {
     }
 
     val content = state as? StudyUiState.Content
+    var actionsFor by remember { mutableStateOf<Segment?>(null) }
     var editing by remember { mutableStateOf<Segment?>(null) }
+    val saved by viewModel.savedWords.collectAsStateWithLifecycle()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -149,22 +166,34 @@ fun StudyScreen(viewModel: StudyViewModel, onBack: () -> Unit) {
                 StudyUiState.Loading -> LoadingState()
                 StudyUiState.NotFound -> MessageState(Icons.Filled.Warning, "Esta transcripción ya no existe", actionLabel = "Volver", onAction = onBack)
                 is StudyUiState.Error -> ErrorState(s.message, onRetry = viewModel::retryLoad)
-                is StudyUiState.Content -> StudyContent(s, viewModel, onEdit = { editing = it })
+                is StudyUiState.Content -> StudyContent(s, viewModel, onLongPress = { actionsFor = it })
             }
         }
     }
 
+    actionsFor?.let { seg ->
+        SegmentActionsDialog(
+            segment = seg,
+            saved = saved,
+            onEditText = { editing = seg; actionsFor = null },
+            onSaveWord = { word, note -> viewModel.saveWord(word, note, seg) },
+            onRemoveWord = viewModel::removeWord,
+            onDismiss = { actionsFor = null },
+        )
+    }
     editing?.let { seg ->
-        EditDialog(
-            initial = seg.texto,
-            onConfirm = { viewModel.editSegment(seg, it); editing = null },
+        TextoDialog(
+            titulo = "Editar frase",
+            inicial = seg.texto,
+            minLines = 2,
+            onConfirm = { if (it.isNotBlank()) viewModel.editSegment(seg, it); editing = null },
             onDismiss = { editing = null },
         )
     }
 }
 
 @Composable
-private fun StudyContent(s: StudyUiState.Content, vm: StudyViewModel, onEdit: (Segment) -> Unit) {
+private fun StudyContent(s: StudyUiState.Content, vm: StudyViewModel, onLongPress: (Segment) -> Unit) {
     val player by vm.playerState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
@@ -207,7 +236,7 @@ private fun StudyContent(s: StudyUiState.Content, vm: StudyViewModel, onEdit: (S
                     hidden = hidden,
                     showEye = s.hideText,
                     onClick = { vm.onSegmentClick(seg) },
-                    onLongClick = { onEdit(seg) },
+                    onLongClick = { onLongPress(seg) },
                     onToggleReveal = { vm.toggleReveal(seg.id) },
                     onToggleFavorite = { vm.toggleFavorite(seg) },
                 )
@@ -260,6 +289,27 @@ private fun PlayerPanel(s: StudyUiState.Content, player: PlayerUiState, vm: Stud
             LabeledSwitch("Repetir frase", s.loop, vm::setLoop)
             LabeledSwitch("Ocultar texto", s.hideText, vm::setHideText)
             LabeledSwitch("Solo favoritas", s.favoritesOnly, vm::setFavoritesOnly)
+        }
+
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Switch(checked = s.shadowing, onCheckedChange = vm::setShadowing)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Shadowing", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (player.waiting) "Repite en voz alta…" else "Pausa tras cada frase para repetirla",
+                    fontSize = 11.sp,
+                    color = if (player.waiting) colorAviso() else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (s.shadowing) {
+            FilaPestanas(
+                opciones = SHADOW_PAUSE_LABELS,
+                seleccion = s.shadowPauseIndex,
+                onSelect = vm::setShadowPause,
+                modifier = Modifier.padding(top = 8.dp),
+            )
         }
     }
 }
@@ -332,14 +382,95 @@ private fun SegmentRow(
     }
 }
 
+/** Acciones de una frase (pulsación larga): guardar palabras, traducir y editar. */
 @Composable
-private fun EditDialog(initial: String, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
-    var text by remember { mutableStateOf(initial) }
-    AlertDialog(
+private fun SegmentActionsDialog(
+    segment: Segment,
+    saved: Map<String, Vocab>,
+    onEditText: () -> Unit,
+    onSaveWord: (String, String) -> Unit,
+    onRemoveWord: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    var selected by remember { mutableStateOf<String?>(null) }
+
+    selected?.let { word ->
+        WordDialog(
+            word = word,
+            existing = saved[word],
+            onSave = { note -> onSaveWord(word, note); selected = null },
+            onRemove = { onRemoveWord(word); selected = null },
+            onDismiss = { selected = null },
+        )
+    }
+
+    androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Editar frase") },
-        text = { OutlinedTextField(text, { text = it }, modifier = Modifier.fillMaxWidth(), minLines = 2) },
-        confirmButton = { TextButton(onClick = { onConfirm(text) }, enabled = text.isNotBlank()) { Text("Guardar") } },
+        title = { Text("Frase") },
+        text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                Text(
+                    "Toca una palabra para guardarla en tu vocabulario.",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(10.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    splitTokens(segment.texto).forEach { token ->
+                        val key = normalizeWord(token)
+                        if (key.isEmpty()) {
+                            Text(token, fontSize = 15.sp)
+                        } else {
+                            val isSaved = key in saved
+                            Box(
+                                Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSaved) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
+                                    .clickable { selected = key }
+                                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                            ) {
+                                Text(token, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    BotonSecundario("Editar texto", onEditText, Modifier.weight(1f))
+                    BotonSecundario("Traducir", { abrirUrl(context, urlTraductor(segment.texto)) }, Modifier.weight(1f))
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } },
+    )
+}
+
+@Composable
+private fun WordDialog(
+    word: String,
+    existing: Vocab?,
+    onSave: (String) -> Unit,
+    onRemove: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    var note by remember { mutableStateOf(existing?.nota ?: "") }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(word) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    note, { note = it }, Modifier.fillMaxWidth(),
+                    label = { Text("Traducción o nota") }, minLines = 2,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    BotonSecundario("Diccionario", { abrirUrl(context, urlDiccionario(word)) }, Modifier.weight(1f))
+                    if (existing != null) BotonSecundario("Quitar", onRemove, Modifier.weight(1f))
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(note) }) { Text("Guardar") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
     )
 }

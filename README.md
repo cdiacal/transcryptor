@@ -23,6 +23,11 @@ Usa siempre `colorIngreso()`, `colorGasto()` y `colorAviso()` para los colores s
 - **Modo estudio**: reproductor con barra de progreso, tocar una frase la reproduce de `inicioMs` a `finMs`,
   «Repetir frase», velocidad 0.75x/1x/1.25x, «Ocultar texto» (difuminado + ojo por frase), favoritas (estrella) y
   filtro «Solo favoritas», frase activa resaltada con scroll automático.
+- **Frases cortas**: las transcripciones nuevas se dividen por puntuación (ajustable en Ajustes); los tiempos se
+  reparten según la longitud de cada frase.
+- **Vocabulario**: pulsación larga en una frase → toca una palabra para guardarla con su traducción/nota y la frase de
+  origen. El diccionario y el traductor se abren en el navegador (la app sigue sin pedir permiso de Internet para ello).
+- **Shadowing**: tras cada frase se pausa 1 s / 2 s / 4 s / la duración de la frase para repetirla en voz alta y pasa a la siguiente.
 - **Ajustes**: modelo (`base.en` / `small.en`, descarga bajo demanda), hilos y tema claro/oscuro/sistema.
 - El modelo (`ggml-base.en.bin`, ~150 MB) **no va en el APK**: se descarga en el primer arranque a
   `filesDir/models/` con barra de progreso, reanudación, comprobación de tamaño y botón de reintentar.

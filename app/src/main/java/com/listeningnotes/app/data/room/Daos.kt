@@ -2,6 +2,7 @@ package com.listeningnotes.app.data.room
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
@@ -60,4 +61,23 @@ abstract class TranscriptionDao {
 
     @Query("UPDATE segments SET favorita = :favorita WHERE id = :segmentId")
     abstract suspend fun setFavorite(segmentId: Long, favorita: Boolean)
+}
+
+@Dao
+interface VocabDao {
+    @Query("SELECT * FROM vocabulary ORDER BY fecha DESC")
+    fun observeAll(): Flow<List<VocabEntity>>
+
+    /** Si la palabra ya existe (índice único) se reemplaza con la nueva frase y nota. */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entity: VocabEntity): Long
+
+    @Query("DELETE FROM vocabulary WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    @Query("DELETE FROM vocabulary WHERE palabra = :palabra")
+    suspend fun deleteByWord(palabra: String)
+
+    @Query("UPDATE vocabulary SET nota = :nota WHERE id = :id")
+    suspend fun updateNote(id: Long, nota: String)
 }

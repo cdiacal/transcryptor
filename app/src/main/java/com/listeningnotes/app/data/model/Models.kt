@@ -18,3 +18,14 @@ data class Segment(
     val texto: String,
     val favorita: Boolean,
 )
+
+data class Vocab(
+    val id: Long,
+    val palabra: String,
+    val nota: String,
+    val contexto: String,
+    val transcriptionId: Long,
+    val inicioMs: Long,
+    val tituloOrigen: String,
+    val fecha: Long,
+)

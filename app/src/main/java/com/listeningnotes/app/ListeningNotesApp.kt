@@ -6,6 +6,7 @@ import com.listeningnotes.app.audio.AudioDecoder
 import com.listeningnotes.app.audio.AudioImporter
 import com.listeningnotes.app.data.repository.SettingsRepository
 import com.listeningnotes.app.data.repository.TranscriptionRepository
+import com.listeningnotes.app.data.repository.VocabularyRepository
 import com.listeningnotes.app.data.room.AppDatabase
 import com.listeningnotes.app.transcription.TranscriptionManager
 import com.listeningnotes.app.transcription.TranscriptionService
@@ -44,6 +45,7 @@ class AppContainer(context: Context) {
     val database: AppDatabase by lazy { AppDatabase.create(appContext) }
     val settings = SettingsRepository(appContext)
     val repository: TranscriptionRepository by lazy { TranscriptionRepository(database.transcriptionDao()) }
+    val vocabulary: VocabularyRepository by lazy { VocabularyRepository(database.vocabDao()) }
     val modelManager = ModelManager(appContext, appScope)
     val importer = AudioImporter(appContext)
 
