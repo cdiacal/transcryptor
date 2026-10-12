@@ -6,6 +6,7 @@ import com.listeningnotes.app.data.room.SegmentEntity
 import com.listeningnotes.app.data.room.TranscriptionDao
 import com.listeningnotes.app.data.room.TranscriptionEntity
 import com.listeningnotes.app.data.room.toModel
+import com.listeningnotes.app.util.likePattern
 import com.listeningnotes.app.whisper.RawSegment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -59,12 +60,4 @@ class TranscriptionRepository(private val dao: TranscriptionDao) {
     suspend fun updateSegmentText(segmentId: Long, texto: String) = dao.updateSegmentText(segmentId, texto.trim())
 
     suspend fun setFavorite(segmentId: Long, favorita: Boolean) = dao.setFavorite(segmentId, favorita)
-
-    companion object {
-        /** Construye el patrón LIKE con comodines escapando % _ y \ (ESCAPE '\'). */
-        fun likePattern(query: String): String {
-            val escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            return "%$escaped%"
-        }
-    }
 }
