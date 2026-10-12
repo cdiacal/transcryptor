@@ -1,10 +1,12 @@
 package com.listeningnotes.app
 
 import android.content.Intent
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.core.content.IntentCompat
@@ -24,7 +26,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // Las cabeceras tienen degradado azul marino bajo la barra de estado: iconos siempre claros.
+        enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT))
 
         if (savedInstanceState == null) {
             handleIntent(intent)

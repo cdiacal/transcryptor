@@ -4,6 +4,12 @@ App Android que **transcribe audios en inglés de forma 100 % offline** (whisper
 **estudiarlos frase a frase**: reproducir una frase en bucle, bajar la velocidad sin cambiar el tono, ocultar el texto
 (modo *listening*), marcar favoritas, etc. La interfaz y los comentarios del código están en español.
 
+## Diseño
+
+Sistema visual «banca sobria, azul marino» (claro/oscuro/sistema): tokens y componentes base en
+`ui/theme/Theme.kt` y `ui/common/Componentes.kt` (`BotonPrincipal`, `TarjetaPanel`, `CabeceraHero`, `FilaPestanas`…).
+Usa siempre `colorIngreso()`, `colorGasto()` y `colorAviso()` para los colores semánticos.
+
 ## Funcionalidades
 
 - **Entrada de audio**: compartir desde WhatsApp u otras apps (`ACTION_SEND` / `ACTION_VIEW` con `audio/*`) o botón

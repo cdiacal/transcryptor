@@ -34,11 +34,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.listeningnotes.app.data.repository.AppSettings
 import com.listeningnotes.app.data.repository.ThemeMode
+import com.listeningnotes.app.ui.common.BarraProgreso
+import com.listeningnotes.app.ui.common.BotonSecundario
+import com.listeningnotes.app.ui.common.CabeceraSimple
+import com.listeningnotes.app.ui.common.FilaPestanas
+import com.listeningnotes.app.ui.common.TarjetaPanel
 import com.listeningnotes.app.ui.common.formatMegabytes
+import com.listeningnotes.app.ui.theme.colorGasto
 import com.listeningnotes.app.whisper.ModelSpec
 import com.listeningnotes.app.whisper.ModelState
 import com.listeningnotes.app.whisper.Models
@@ -49,81 +59,78 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val modelStates by viewModel.modelStates.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Ajustes") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver") } },
-            )
-        },
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = { CabeceraSimple("Ajustes", onBack, subtitulo = "Modelo, rendimiento y apariencia") },
     ) { padding ->
         Column(
             Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            SectionTitle("Modelo de transcripción")
-            Models.all.forEach { spec ->
-                ModelRow(
-                    spec = spec,
-                    selected = spec.id == settings.modelId,
-                    state = modelStates[spec.id] ?: ModelState.NotInstalled(),
-                    onSelect = { viewModel.selectModel(spec) },
-                    onDownload = { viewModel.download(spec) },
-                    onPause = { viewModel.pause(spec) },
-                    onDelete = { viewModel.delete(spec) },
+            TarjetaPanel(Modifier.fillMaxWidth()) {
+                SectionTitle("Modelo de transcripción")
+                Models.all.forEach { spec ->
+                    ModelRow(
+                        spec = spec,
+                        selected = spec.id == settings.modelId,
+                        state = modelStates[spec.id] ?: ModelState.NotInstalled(),
+                        onSelect = { viewModel.selectModel(spec) },
+                        onDownload = { viewModel.download(spec) },
+                        onPause = { viewModel.pause(spec) },
+                        onDelete = { viewModel.delete(spec) },
+                    )
+                }
+                Text(
+                    "small.en es más preciso pero más lento y necesita más memoria. Se descarga la primera vez que lo eliges.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Text(
-                "small.en es más preciso pero más lento y necesita más memoria. Se descarga la primera vez que lo eliges.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
 
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            SectionTitle("Hilos de CPU")
-            val max = AppSettings.maxThreads()
-            Text("${settings.threads} de $max", style = MaterialTheme.typography.bodyMedium)
-            if (max > 1) {
-                Slider(
-                    value = settings.threads.toFloat(),
-                    onValueChange = { viewModel.setThreads(it.toInt().coerceIn(1, max)) },
-                    valueRange = 1f..max.toFloat(),
-                    steps = (max - 2).coerceAtLeast(0),
+            TarjetaPanel(Modifier.fillMaxWidth()) {
+                SectionTitle("Hilos de CPU")
+                val max = AppSettings.maxThreads()
+                Text("${settings.threads} de $max", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                if (max > 1) {
+                    Slider(
+                        value = settings.threads.toFloat(),
+                        onValueChange = { viewModel.setThreads(it.toInt().coerceIn(1, max)) },
+                        valueRange = 1f..max.toFloat(),
+                        steps = (max - 2).coerceAtLeast(0),
+                    )
+                }
+                Text(
+                    "Más hilos aceleran la transcripción pero calientan el móvil. Recomendado: ${AppSettings.defaultThreads()}.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Text(
-                "Más hilos aceleran la transcripción pero calientan el móvil. Recomendado: ${AppSettings.defaultThreads()}.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
 
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            SectionTitle("Tema")
-            ThemeMode.entries.forEach { mode ->
-                Row(
-                    Modifier.fillMaxWidth().selectable(
-                        selected = settings.theme == mode,
-                        onClick = { viewModel.setTheme(mode) },
-                        role = Role.RadioButton,
-                    ),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(selected = settings.theme == mode, onClick = null)
-                    Text(mode.label, Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp))
+            TarjetaPanel(Modifier.fillMaxWidth()) {
+                SectionTitle("Tema")
+                val modos = ThemeMode.entries
+                FilaPestanas(
+                    opciones = modos.map { it.label },
+                    seleccion = modos.indexOf(settings.theme),
+                    onSelect = { viewModel.setTheme(modos[it]) },
+                )
+            }
+
+            TarjetaPanel(Modifier.fillMaxWidth()) {
+                SectionTitle("Motor")
+                var info by remember { mutableStateOf<String?>(null) }
+                BotonSecundario("Ver información del motor", { info = viewModel.engineInfo() })
+                info?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            SectionTitle("Motor")
-            var info by remember { mutableStateOf<String?>(null) }
-            OutlinedButton(onClick = { info = viewModel.engineInfo() }) { Text("Ver información del motor") }
-            info?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         }
     }
 }
 
 @Composable
 private fun SectionTitle(text: String) {
-    Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+    Text(text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
 }
 
 @Composable
@@ -150,7 +157,7 @@ private fun ModelRow(
                             if (state.partialBytes > 0) "Descarga a medias (${formatMegabytes(state.partialBytes)})" else "No descargado"
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (state is ModelState.Error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (state is ModelState.Error) colorGasto() else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             when (state) {
@@ -164,7 +171,7 @@ private fun ModelRow(
         }
         if (state is ModelState.Downloading) {
             val fraction = if (state.total > 0) (state.downloaded.toFloat() / state.total).coerceIn(0f, 1f) else 0f
-            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth().padding(start = 48.dp))
+            BarraProgreso(fraction, Modifier.padding(start = 48.dp))
             Text(
                 "${(fraction * 100).toInt()} %  ·  ${formatMegabytes(state.downloaded)} / ${formatMegabytes(state.total)}",
                 style = MaterialTheme.typography.bodySmall,

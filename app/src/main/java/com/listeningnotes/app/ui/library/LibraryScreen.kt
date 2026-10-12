@@ -45,10 +45,23 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.listeningnotes.app.data.model.Transcription
 import com.listeningnotes.app.transcription.JobState
+import com.listeningnotes.app.ui.common.BarraProgreso
+import com.listeningnotes.app.ui.common.BotonPrincipal
+import com.listeningnotes.app.ui.common.CabeceraHero
+import com.listeningnotes.app.ui.common.CifraHero
+import com.listeningnotes.app.ui.common.EtiquetaHero
+import com.listeningnotes.app.ui.common.IconoCabecera
+import com.listeningnotes.app.ui.common.IconoInicial
+import com.listeningnotes.app.ui.common.MiniDatoHero
+import com.listeningnotes.app.ui.common.TarjetaPanel
+import com.listeningnotes.app.ui.theme.colorGasto
+import com.listeningnotes.app.ui.theme.colorIngreso
 import com.listeningnotes.app.ui.common.ErrorState
 import com.listeningnotes.app.ui.common.LoadingState
 import com.listeningnotes.app.ui.common.MessageState
@@ -76,25 +89,34 @@ fun LibraryScreen(
     var deleting by remember { mutableStateOf<Transcription?>(null) }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text("Biblioteca") },
-                actions = {
-                    IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "Ajustes") }
-                },
-            )
+            val items = (state as? LibraryUiState.Content)?.items.orEmpty()
+            CabeceraHero {
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text(
+                        "Biblioteca", Modifier.weight(1f), color = androidx.compose.ui.graphics.Color.White,
+                        fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                    )
+                    IconoCabecera(Icons.Filled.Settings, "Ajustes", onSettings)
+                }
+                Spacer(Modifier.size(14.dp))
+                CifraHero(items.size.toString())
+                EtiquetaHero(if (query.isBlank()) "transcripciones" else "resultados de la búsqueda")
+                Spacer(Modifier.size(14.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+                    MiniDatoHero("Duración total", formatClock(items.sumOf { it.duracionMs }))
+                    MiniDatoHero("Modelo", model?.spec?.id ?: "—")
+                }
+            }
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onNew,
-                icon = { Icon(Icons.Filled.Add, null) },
-                text = { Text("Nueva transcripción") },
-            )
+            BotonPrincipal("Nueva transcripción", onNew, icono = Icons.Filled.Add)
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Column(Modifier.padding(padding)) {
-            Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = query,
                     onValueChange = viewModel::setQuery,
@@ -173,20 +195,25 @@ private fun TranscriptionRow(
     onDelete: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
-    Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-        Row(Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 4.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+    TarjetaPanel(Modifier.fillMaxWidth(), onClick = onClick, contentPadding = PaddingValues(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp)) {
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            IconoInicial(item.titulo, item.id)
+            Spacer(Modifier.size(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(item.titulo, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+                Text(item.titulo, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
                 Spacer(Modifier.size(2.dp))
                 val date = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(item.fecha))
                 Text(
                     "${formatClock(item.duracionMs)} · $date · ${item.modelo}",
-                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                 )
             }
             Column {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "Más opciones") }
+                IconButton(onClick = { menu = true }) {
+                    Icon(Icons.Filled.MoreVert, "Más opciones", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(text = { Text("Renombrar") }, onClick = { menu = false; onRename() })
                     DropdownMenuItem(text = { Text("Eliminar") }, onClick = { menu = false; onDelete() })
@@ -220,31 +247,26 @@ private fun JobBanner(
 ) {
     when (job) {
         JobState.Idle -> Unit
-        is JobState.Running -> Card(
-            Modifier.fillMaxWidth().clickable(onClick = onOpenJob),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        is JobState.Running -> TarjetaPanel(
+            Modifier.fillMaxWidth(), onClick = onOpenJob,
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
         ) {
-            Column(Modifier.padding(16.dp)) {
-                Text(job.title.ifBlank { "Transcribiendo" }, style = MaterialTheme.typography.titleSmall, maxLines = 1)
-                Text(job.stage.label, style = MaterialTheme.typography.bodySmall)
-                androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
-                val p = job.progress
-                if (p != null) LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth())
-                else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
+            Text(job.title.ifBlank { "Transcribiendo" }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text(job.stage.label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.size(10.dp))
+            BarraProgreso(job.progress)
         }
-        is JobState.Done -> Card(
-            Modifier.fillMaxWidth().clickable { onOpenResult(job.transcriptionId) },
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-        ) {
-            Text("Transcripción lista. Toca para abrirla.", Modifier.padding(16.dp), style = MaterialTheme.typography.titleSmall)
+        is JobState.Done -> TarjetaPanel(Modifier.fillMaxWidth(), onClick = { onOpenResult(job.transcriptionId) }) {
+            Text("Transcripción lista. Toca para abrirla.", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = colorIngreso())
         }
-        is JobState.Failed -> Card(
+        is JobState.Failed -> TarjetaPanel(
             Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            borderColor = colorGasto(),
+            contentPadding = PaddingValues(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
         ) {
-            Row(Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 4.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Text(job.message, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text(job.message, Modifier.weight(1f), fontSize = 13.sp, color = colorGasto())
                 TextButton(onClick = onDismiss) { Text("Cerrar") }
             }
         }

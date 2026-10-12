@@ -45,6 +45,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.listeningnotes.app.transcription.JobState
+import com.listeningnotes.app.ui.common.BarraProgreso
+import com.listeningnotes.app.ui.common.BotonSecundario
+import com.listeningnotes.app.ui.common.CabeceraSimple
 import com.listeningnotes.app.ui.common.ModelBanner
 import com.listeningnotes.app.ui.common.MessageState
 
@@ -93,13 +96,9 @@ fun TranscribeScreen(
     val pickAudio = { picker.launch(arrayOf("audio/*", "application/ogg")) }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text("Nueva transcripción") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver") }
-                },
-            )
+            CabeceraSimple("Nueva transcripción", onBack, subtitulo = "Todo se procesa en tu móvil, sin conexión")
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
@@ -129,7 +128,7 @@ fun TranscribeScreen(
                         textAlign = TextAlign.Center,
                     )
                     Spacer(Modifier.height(16.dp))
-                    OutlinedButton(onClick = viewModel::cancelWaiting) { Text("Cancelar") }
+                    BotonSecundario("Cancelar", viewModel::cancelWaiting)
                 }
                 else -> MessageState(
                     Icons.Filled.FolderOpen, "Elige un audio en inglés",
@@ -156,12 +155,8 @@ private fun RunningContent(job: JobState.Running, onCancel: () -> Unit) {
         }
         Text(job.stage.label, style = MaterialTheme.typography.bodyLarge)
         val p = job.progress
-        if (p != null) {
-            LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth())
-            Text("${(p * 100).toInt()} %", style = MaterialTheme.typography.bodyMedium)
-        } else {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        }
+        BarraProgreso(p)
+        if (p != null) Text("${(p * 100).toInt()} %", style = MaterialTheme.typography.bodyMedium)
         Text(
             "Todo se procesa en tu móvil, sin conexión. Los audios largos pueden tardar varios minutos; " +
                 "la pantalla se mantiene encendida mientras tanto.",
@@ -169,7 +164,7 @@ private fun RunningContent(job: JobState.Running, onCancel: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        Button(onClick = onCancel) { Text("Cancelar") }
+        BotonSecundario("Cancelar", onCancel)
         Spacer(Modifier.size(1.dp))
     }
 }

@@ -3,5 +3,6 @@
     <style name="Theme.ListeningNotes" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">#F5F6FA</item>
     </style>
 </resources>

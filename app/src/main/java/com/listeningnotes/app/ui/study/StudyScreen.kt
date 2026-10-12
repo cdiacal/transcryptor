@@ -68,10 +68,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.listeningnotes.app.audio.PlayerUiState
 import com.listeningnotes.app.data.model.Segment
+import com.listeningnotes.app.ui.common.CabeceraSimple
+import com.listeningnotes.app.ui.common.FilaPestanas
+import com.listeningnotes.app.ui.common.IconoCabecera
+import com.listeningnotes.app.ui.common.TarjetaPanel
+import com.listeningnotes.app.ui.theme.colorAviso
 import com.listeningnotes.app.ui.common.ErrorState
 import com.listeningnotes.app.ui.common.LoadingState
 import com.listeningnotes.app.ui.common.MessageState
@@ -100,15 +107,15 @@ fun StudyScreen(viewModel: StudyViewModel, onBack: () -> Unit) {
     var editing by remember { mutableStateOf<Segment?>(null) }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text(content?.transcription?.titulo ?: "Estudio", maxLines = 1) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver") }
-                },
-                actions = {
+            CabeceraSimple(
+                titulo = content?.transcription?.titulo ?: "Estudio",
+                onBack = onBack,
+                subtitulo = content?.let { "${formatClock(it.transcription.duracionMs)} · ${it.allSegments.size} frases · ${it.transcription.modelo}" },
+                acciones = {
                     if (content != null) {
-                        IconButton(onClick = {
+                        IconoCabecera(Icons.Filled.ContentCopy, "Copiar todo") {
                             scope.launch {
                                 viewModel.textForClipboard()?.let {
                                     val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -116,8 +123,8 @@ fun StudyScreen(viewModel: StudyViewModel, onBack: () -> Unit) {
                                     snackbar.showSnackbar("Texto copiado")
                                 }
                             }
-                        }) { Icon(Icons.Filled.ContentCopy, "Copiar todo") }
-                        IconButton(onClick = {
+                        }
+                        IconoCabecera(Icons.Filled.Share, "Compartir como .txt") {
                             scope.launch {
                                 val uri = viewModel.createShareUri(context) ?: return@launch
                                 val send = Intent(Intent.ACTION_SEND).apply {
@@ -127,9 +134,9 @@ fun StudyScreen(viewModel: StudyViewModel, onBack: () -> Unit) {
                                 }
                                 context.startActivity(Intent.createChooser(send, "Compartir transcripción"))
                             }
-                        }) { Icon(Icons.Filled.Share, "Compartir como .txt") }
-                        IconButton(onClick = { saveLauncher.launch(viewModel.suggestedFileName()) }) {
-                            Icon(Icons.Filled.Save, "Guardar como .txt")
+                        }
+                        IconoCabecera(Icons.Filled.Save, "Guardar como .txt") {
+                            saveLauncher.launch(viewModel.suggestedFileName())
                         }
                     }
                 },
@@ -211,50 +218,48 @@ private fun StudyContent(s: StudyUiState.Content, vm: StudyViewModel, onEdit: (S
 
 @Composable
 private fun PlayerPanel(s: StudyUiState.Content, player: PlayerUiState, vm: StudyViewModel) {
-    Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            // Barra de progreso: mientras se arrastra mostramos el valor local y solo buscamos al soltar.
-            var dragging by remember { mutableStateOf(false) }
-            var dragValue by remember { mutableFloatStateOf(0f) }
-            val duration = if (player.durationMs > 0) player.durationMs else s.transcription.duracionMs
-            val fraction = if (duration > 0) (player.positionMs.toFloat() / duration).coerceIn(0f, 1f) else 0f
+    TarjetaPanel(Modifier.fillMaxWidth().padding(16.dp, 12.dp, 16.dp, 4.dp)) {
+        // Barra de progreso: mientras se arrastra mostramos el valor local y solo buscamos al soltar.
+        var dragging by remember { mutableStateOf(false) }
+        var dragValue by remember { mutableFloatStateOf(0f) }
+        val duration = if (player.durationMs > 0) player.durationMs else s.transcription.duracionMs
+        val fraction = if (duration > 0) (player.positionMs.toFloat() / duration).coerceIn(0f, 1f) else 0f
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                FilledIconButton(onClick = vm::togglePlay, enabled = s.audioAvailable) {
-                    Icon(
-                        if (player.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        if (player.isPlaying) "Pausar" else "Reproducir",
-                    )
-                }
-                Slider(
-                    value = if (dragging) dragValue else fraction,
-                    onValueChange = { dragging = true; dragValue = it },
-                    onValueChangeFinished = {
-                        vm.seekTo((dragValue * duration).toLong())
-                        dragging = false
-                    },
-                    enabled = s.audioAvailable && duration > 0,
-                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            FilledIconButton(onClick = vm::togglePlay, enabled = s.audioAvailable) {
+                Icon(
+                    if (player.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    if (player.isPlaying) "Pausar" else "Reproducir",
                 )
-                val shown = if (dragging) (dragValue * duration).toLong() else player.positionMs
-                Text("${formatClock(shown)} / ${formatClock(duration)}", style = MaterialTheme.typography.labelMedium)
             }
+            Slider(
+                value = if (dragging) dragValue else fraction,
+                onValueChange = { dragging = true; dragValue = it },
+                onValueChangeFinished = {
+                    vm.seekTo((dragValue * duration).toLong())
+                    dragging = false
+                },
+                enabled = s.audioAvailable && duration > 0,
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+            )
+            val shown = if (dragging) (dragValue * duration).toLong() else player.positionMs
+            Text(
+                "${formatClock(shown)} / ${formatClock(duration)}",
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+            )
+        }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 4.dp)) {
-                SPEEDS.forEach { speed ->
-                    FilterChip(
-                        selected = player.speed == speed,
-                        onClick = { vm.setSpeed(speed) },
-                        label = { Text(speedLabel(speed)) },
-                    )
-                }
-            }
+        FilaPestanas(
+            opciones = SPEEDS.map { speedLabel(it) },
+            seleccion = SPEEDS.indexOf(player.speed).coerceAtLeast(1),
+            onSelect = { vm.setSpeed(SPEEDS[it]) },
+            modifier = Modifier.padding(vertical = 8.dp),
+        )
 
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                LabeledSwitch("Repetir frase", s.loop, vm::setLoop)
-                LabeledSwitch("Ocultar texto", s.hideText, vm::setHideText)
-                LabeledSwitch("Solo favoritas", s.favoritesOnly, vm::setFavoritesOnly)
-            }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            LabeledSwitch("Repetir frase", s.loop, vm::setLoop)
+            LabeledSwitch("Ocultar texto", s.hideText, vm::setHideText)
+            LabeledSwitch("Solo favoritas", s.favoritesOnly, vm::setFavoritesOnly)
         }
     }
 }
@@ -284,25 +289,27 @@ private fun SegmentRow(
     onToggleReveal: () -> Unit,
     onToggleFavorite: () -> Unit,
 ) {
-    val container = if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-    Card(
+    TarjetaPanel(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(16.dp))
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
-        colors = CardDefaults.cardColors(containerColor = container),
+        containerColor = if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        borderColor = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+        contentPadding = PaddingValues(start = 14.dp, top = 4.dp, bottom = 4.dp, end = 0.dp),
     ) {
-        Row(Modifier.padding(start = 12.dp, top = 4.dp, bottom = 4.dp, end = 0.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 "[${formatClock(segment.inicioMs)}]",
-                style = MaterialTheme.typography.labelMedium,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
             )
             Spacer(Modifier.width(8.dp))
             ObscuredText(
                 text = segment.texto,
                 hidden = hidden,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f).padding(vertical = 8.dp),
             )
             if (showEye) {
@@ -310,6 +317,7 @@ private fun SegmentRow(
                     Icon(
                         if (hidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
                         if (hidden) "Mostrar frase" else "Ocultar frase",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -317,7 +325,7 @@ private fun SegmentRow(
                 Icon(
                     if (segment.favorita) Icons.Filled.Star else Icons.Filled.StarBorder,
                     if (segment.favorita) "Quitar de favoritas" else "Marcar como favorita",
-                    tint = if (segment.favorita) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (segment.favorita) colorAviso() else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

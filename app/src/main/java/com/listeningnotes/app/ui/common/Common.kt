@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.listeningnotes.app.ui.theme.colorGasto
 import com.listeningnotes.app.whisper.ModelSpec
 import com.listeningnotes.app.whisper.ModelState
 
@@ -79,7 +80,7 @@ fun MessageState(
         }
         if (actionLabel != null && onAction != null) {
             Spacer(Modifier.height(20.dp))
-            Button(onClick = onAction) { Text(actionLabel) }
+            BotonPrincipal(actionLabel, onAction)
         }
     }
 }
@@ -117,54 +118,46 @@ fun ModelBanner(
     modifier: Modifier = Modifier,
 ) {
     if (state is ModelState.Ready) return
-    Card(
-        modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            when (state) {
-                is ModelState.Downloading -> {
-                    val fraction = if (state.total > 0) (state.downloaded.toFloat() / state.total).coerceIn(0f, 1f) else 0f
-                    Text("Descargando el modelo ${spec.id}…", style = MaterialTheme.typography.titleSmall)
-                    Spacer(Modifier.height(8.dp))
-                    LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(4.dp))
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "${(fraction * 100).toInt()} %  ·  ${formatMegabytes(state.downloaded)} / ${formatMegabytes(state.total)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.weight(1f),
-                        )
-                        TextButton(onClick = onPause) { Text("Pausar") }
-                    }
-                }
-                is ModelState.Error -> {
-                    Text("No se pudo descargar el modelo", style = MaterialTheme.typography.titleSmall)
-                    Spacer(Modifier.height(4.dp))
-                    Text(state.message, style = MaterialTheme.typography.bodySmall)
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(onClick = onDownload) {
-                        Icon(Icons.Filled.Refresh, null, Modifier.size(18.dp))
-                        Spacer(Modifier.size(8.dp))
-                        Text("Reintentar")
-                    }
-                }
-                is ModelState.NotInstalled -> {
-                    Text("Falta descargar el modelo ${spec.id}", style = MaterialTheme.typography.titleSmall)
-                    Spacer(Modifier.height(4.dp))
+    TarjetaPanel(modifier.fillMaxWidth()) {
+        when (state) {
+            is ModelState.Downloading -> {
+                val fraction = if (state.total > 0) (state.downloaded.toFloat() / state.total).coerceIn(0f, 1f) else 0f
+                Text("Descargando el modelo ${spec.id}…", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(10.dp))
+                BarraProgreso(fraction)
+                Spacer(Modifier.height(6.dp))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "Se descarga una sola vez (${formatMegabytes(spec.approxBytes)}) y después todo funciona sin conexión.",
+                        "${(fraction * 100).toInt()} %  ·  ${formatMegabytes(state.downloaded)} / ${formatMegabytes(state.total)}",
                         style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
                     )
-                    Spacer(Modifier.height(8.dp))
-                    Button(onClick = onDownload) {
-                        Icon(Icons.Filled.Download, null, Modifier.size(18.dp))
-                        Spacer(Modifier.size(8.dp))
-                        Text(if (state.partialBytes > 0) "Reanudar descarga" else "Descargar")
-                    }
+                    TextButton(onClick = onPause) { Text("Pausar") }
                 }
-                ModelState.Ready -> Unit
             }
+            is ModelState.Error -> {
+                Text("No se pudo descargar el modelo", style = MaterialTheme.typography.titleSmall, color = colorGasto())
+                Spacer(Modifier.height(4.dp))
+                Text(state.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(12.dp))
+                BotonSecundario("Reintentar", onDownload, icono = Icons.Filled.Refresh)
+            }
+            is ModelState.NotInstalled -> {
+                Text("Falta descargar el modelo ${spec.id}", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Se descarga una sola vez (${formatMegabytes(spec.approxBytes)}) y después todo funciona sin conexión.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                BotonPrincipal(
+                    if (state.partialBytes > 0) "Reanudar descarga" else "Descargar",
+                    onDownload, icono = Icons.Filled.Download,
+                )
+            }
+            ModelState.Ready -> Unit
         }
     }
 }
