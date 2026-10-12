@@ -31,7 +31,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -311,7 +313,7 @@ fun TextoDialog(
         text = {
             androidx.compose.material3.OutlinedTextField(
                 text, { text = it }, Modifier.fillMaxWidth(),
-                label = etiqueta?.let { { Text(it) } }, minLines = minLines,
+                label = if (etiqueta != null) ({ Text(etiqueta) }) else null, minLines = minLines,
             )
         },
         confirmButton = { androidx.compose.material3.TextButton(onClick = { onConfirm(text) }) { Text("Guardar") } },
