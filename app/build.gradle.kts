@@ -96,6 +96,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.mlkit.translate)
     implementation(libs.kotlinx.coroutines.android)
     debugImplementation(libs.androidx.compose.ui.tooling)
 

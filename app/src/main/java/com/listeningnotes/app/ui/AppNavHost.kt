@@ -18,6 +18,8 @@ import com.listeningnotes.app.ui.settings.SettingsScreen
 import com.listeningnotes.app.ui.settings.SettingsViewModel
 import com.listeningnotes.app.ui.study.StudyScreen
 import com.listeningnotes.app.ui.study.StudyViewModel
+import com.listeningnotes.app.ui.keywords.KeywordsScreen
+import com.listeningnotes.app.ui.keywords.KeywordsViewModel
 import com.listeningnotes.app.ui.vocab.VocabScreen
 import com.listeningnotes.app.ui.vocab.VocabViewModel
 import com.listeningnotes.app.ui.transcribe.TranscribeScreen
@@ -28,6 +30,8 @@ private object Routes {
     const val NEW = "new"
     const val SETTINGS = "settings"
     const val VOCAB = "vocab"
+    const val KEYWORDS = "keywords/{id}"
+    fun keywords(id: Long) = "keywords/$id"
     const val STUDY = "study/{id}"
     fun study(id: Long) = "study/$id"
 }
@@ -71,7 +75,15 @@ fun AppNavHost(container: AppContainer) {
         ) { entry ->
             val id = entry.arguments?.getLong("id") ?: 0L
             val vm: StudyViewModel = viewModel(key = "study-$id", factory = SimpleFactory { StudyViewModel(container, id) })
-            StudyScreen(vm, onBack = { nav.popBackStack() })
+            StudyScreen(vm, onBack = { nav.popBackStack() }, onKeywords = { nav.navigate(Routes.keywords(id)) })
+        }
+        composable(
+            Routes.KEYWORDS,
+            arguments = listOf(navArgument("id") { type = NavType.LongType }),
+        ) { entry ->
+            val id = entry.arguments?.getLong("id") ?: 0L
+            val vm: KeywordsViewModel = viewModel(key = "keywords-$id", factory = SimpleFactory { KeywordsViewModel(container, id) })
+            KeywordsScreen(vm, onBack = { nav.popBackStack() })
         }
         composable(Routes.VOCAB) {
             val vm: VocabViewModel = viewModel(factory = SimpleFactory { VocabViewModel(container) })

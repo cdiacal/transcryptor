@@ -30,6 +30,10 @@ Usa siempre `colorIngreso()`, `colorGasto()` y `colorAviso()` para los colores s
   reparten según la longitud de cada frase.
 - **Vocabulario**: pulsación larga en una frase → toca una palabra para guardarla con su traducción/nota y la frase de
   origen. El diccionario y el traductor se abren en el navegador (la app sigue sin pedir permiso de Internet para ello).
+- **Vocabulario del audio**: analiza la transcripción y saca las palabras clave del tema (sin palabras básicas, agrupando
+  formas como travel/travelling y descartando nombres propios), con su traducción al español y una frase de ejemplo. Se
+  guardan de una en una o todas a la vez. La traducción usa ML Kit (inglés→español): descarga un modelo de ~30 MB la
+  primera vez y después funciona sin conexión.
 - **Shadowing**: tras cada frase se pausa 1 s / 2 s / 4 s / la duración de la frase para repetirla en voz alta y pasa a la siguiente.
 - **Ajustes**: modelo (`base.en` / `small.en`, descarga bajo demanda), hilos y tema claro/oscuro/sistema.
 - El modelo (`ggml-base.en.bin`, ~150 MB) **no va en el APK**: se descarga en el primer arranque a
@@ -103,7 +107,7 @@ app/src/main/
 
 ## Permisos
 
-Solo `INTERNET` (únicamente para descargar el modelo), `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC` y
+Solo `INTERNET` (únicamente para descargar los modelos de whisper y de traducción), `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC` y
 `POST_NOTIFICATIONS` (notificación de progreso en audios largos; si la rechazas todo sigue funcionando). No se
 piden permisos de almacenamiento.
 

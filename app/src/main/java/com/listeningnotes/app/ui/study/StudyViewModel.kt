@@ -186,6 +186,15 @@ class StudyViewModel(private val container: AppContainer, private val transcript
         }
     }
 
+    /** Traduce una palabra con ML Kit (descarga el modelo la primera vez). Null si falla. */
+    suspend fun translate(word: String): String? = try {
+        container.translator.ensureModel()
+        container.translator.translate(word)
+    } catch (e: Exception) {
+        _messages.trySend(e.message ?: "No se pudo traducir")
+        null
+    }
+
     fun removeWord(word: String) {
         viewModelScope.launch {
             try {

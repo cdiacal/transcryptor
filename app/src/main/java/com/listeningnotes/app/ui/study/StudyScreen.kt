@@ -83,6 +83,7 @@ import com.listeningnotes.app.data.model.Segment
 import com.listeningnotes.app.ui.common.CabeceraSimple
 import com.listeningnotes.app.ui.common.FilaPestanas
 import com.listeningnotes.app.ui.common.IconoCabecera
+import com.listeningnotes.app.analysis.KeywordExtractor
 import com.listeningnotes.app.ui.common.TarjetaPanel
 import com.listeningnotes.app.ui.common.TextoDialog
 import com.listeningnotes.app.ui.common.BotonPrincipal
@@ -106,7 +107,7 @@ import kotlinx.coroutines.launch
 private val SPEEDS = listOf(0.75f, 1f, 1.25f)
 
 @Composable
-fun StudyScreen(viewModel: StudyViewModel, onBack: () -> Unit) {
+fun StudyScreen(viewModel: StudyViewModel, onBack: () -> Unit, onKeywords: () -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -160,7 +161,7 @@ fun StudyScreen(viewModel: StudyViewModel, onBack: () -> Unit) {
                 StudyUiState.Loading -> LoadingState()
                 StudyUiState.NotFound -> MessageState(Icons.Filled.Warning, "Esta transcripción ya no existe", actionLabel = "Volver", onAction = onBack)
                 is StudyUiState.Error -> ErrorState(s.message, onRetry = viewModel::retryLoad)
-                is StudyUiState.Content -> StudyContent(s, viewModel, onLongPress = { actionsFor = it })
+                is StudyUiState.Content -> StudyContent(s, viewModel, onKeywords = onKeywords, onLongPress = { actionsFor = it })
             }
         }
     }
@@ -197,6 +198,7 @@ fun StudyScreen(viewModel: StudyViewModel, onBack: () -> Unit) {
             onEditText = { editing = seg; actionsFor = null },
             onSaveWord = { word, note -> viewModel.saveWord(word, note, seg) },
             onRemoveWord = viewModel::removeWord,
+            onTranslate = viewModel::translate,
             onDismiss = { actionsFor = null },
         )
     }
@@ -212,7 +214,7 @@ fun StudyScreen(viewModel: StudyViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun StudyContent(s: StudyUiState.Content, vm: StudyViewModel, onLongPress: (Segment) -> Unit) {
+private fun StudyContent(s: StudyUiState.Content, vm: StudyViewModel, onKeywords: () -> Unit, onLongPress: (Segment) -> Unit) {
     val player by vm.playerState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
@@ -247,6 +249,23 @@ private fun StudyContent(s: StudyUiState.Content, vm: StudyViewModel, onLongPres
             contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 32.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            item(key = "topic") {
+                val topic = remember(s.allSegments) { KeywordExtractor.topic(KeywordExtractor.extract(s.allSegments.map { it.texto })) }
+                if (topic.isNotEmpty()) {
+                    TarjetaPanel(Modifier.fillMaxWidth(), onClick = onKeywords) {
+                        Text("Vocabulario del audio", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            topic.joinToString(" · "), fontSize = 13.sp, color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                        Text(
+                            "Toca para ver las palabras clave con su traducción",
+                            fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
+            }
             items(s.segments, key = { it.id }) { seg ->
                 val hidden = s.hideText && seg.id !in s.revealed
                 SegmentRow(
@@ -409,6 +428,7 @@ private fun SegmentActionsDialog(
     onEditText: () -> Unit,
     onSaveWord: (String, String) -> Unit,
     onRemoveWord: (String) -> Unit,
+    onTranslate: suspend (String) -> String?,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -419,6 +439,7 @@ private fun SegmentActionsDialog(
             word = word,
             existing = saved[word],
             onSave = { note -> onSaveWord(word, note); selected = null },
+            onTranslate = onTranslate,
             onRemove = { onRemoveWord(word); selected = null },
             onDismiss = { selected = null },
         )
@@ -470,9 +491,12 @@ private fun WordDialog(
     existing: Vocab?,
     onSave: (String) -> Unit,
     onRemove: () -> Unit,
+    onTranslate: suspend (String) -> String?,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var translating by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf(existing?.nota ?: "") }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
@@ -482,6 +506,17 @@ private fun WordDialog(
                 OutlinedTextField(
                     note, { note = it }, Modifier.fillMaxWidth(),
                     label = { Text("Traducción o nota") }, minLines = 2,
+                )
+                BotonSecundario(
+                    if (translating) "Traduciendo…" else "Traducir al español",
+                    {
+                        translating = true
+                        scope.launch {
+                            onTranslate(word)?.let { note = it }
+                            translating = false
+                        }
+                    },
+                    Modifier.fillMaxWidth(), enabled = !translating,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     BotonSecundario("Diccionario", { abrirUrl(context, urlDiccionario(word)) }, Modifier.weight(1f))
