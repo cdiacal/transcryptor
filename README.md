@@ -29,7 +29,8 @@ Usa siempre `colorIngreso()`, `colorGasto()` y `colorAviso()` para los colores s
 - **Frases cortas**: las transcripciones nuevas se dividen por puntuación (ajustable en Ajustes); los tiempos se
   reparten según la longitud de cada frase.
 - **Vocabulario**: pulsación larga en una frase → toca una palabra para guardarla con su traducción/nota y la frase de
-  origen. El diccionario y el traductor se abren en el navegador (la app sigue sin pedir permiso de Internet para ello).
+  origen. El diccionario y el traductor se abren en el navegador (la app sigue sin pedir permiso de Internet para ello). En la lista se pueden seleccionar varias palabras
+  (icono de lista o pulsación larga) y borrarlas de una vez.
 - **Vocabulario del audio**: analiza la transcripción y saca las palabras clave del tema (sin palabras básicas, agrupando
   formas como travel/travelling y descartando nombres propios), con su traducción al español y una frase de ejemplo. Se
   guardan de una en una o todas a la vez. La traducción usa ML Kit (inglés→español): descarga un modelo de ~30 MB la

@@ -32,6 +32,7 @@ class VocabViewModel(container: AppContainer) : ViewModel() {
     val messages = _messages.receiveAsFlow()
 
     fun updateNote(item: Vocab, note: String) = launchSafe("No se pudo guardar la nota") { repository.updateNote(item.id, note) }
+    fun deleteMany(ids: Set<Long>) = launchSafe("No se pudieron borrar las palabras") { repository.deleteMany(ids) }
     fun delete(item: Vocab) = launchSafe("No se pudo borrar la palabra") { repository.delete(item.id) }
 
     private fun launchSafe(error: String, block: suspend () -> Unit) {

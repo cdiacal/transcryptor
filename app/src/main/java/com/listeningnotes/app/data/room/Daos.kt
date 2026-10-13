@@ -75,6 +75,9 @@ interface VocabDao {
     @Query("DELETE FROM vocabulary WHERE id = :id")
     suspend fun delete(id: Long)
 
+    @Query("DELETE FROM vocabulary WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
+
     @Query("DELETE FROM vocabulary WHERE palabra = :palabra")
     suspend fun deleteByWord(palabra: String)
 

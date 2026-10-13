@@ -1,4 +1,16 @@
+@file:OptIn(ExperimentalFoundationApi::class)
+
 package com.listeningnotes.app.ui.vocab
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material3.Checkbox
+import com.listeningnotes.app.ui.common.IconoCabecera
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -54,14 +66,43 @@ fun VocabScreen(viewModel: VocabViewModel, onBack: () -> Unit, onOpenTranscripti
     val context = LocalContext.current
     var editing by remember { mutableStateOf<Vocab?>(null) }
     var deleting by remember { mutableStateOf<Vocab?>(null) }
+    var selecting by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf(setOf<Long>()) }
+    var confirmMany by remember { mutableStateOf(false) }
+
+    val allWords = (state as? VocabUiState.Content)?.items.orEmpty()
+    // Si desaparecen palabras (borradas), las quitamos de la selección.
+    LaunchedEffect(allWords) { selected = selected.intersect(allWords.map { it.id }.toSet()) }
+    LaunchedEffect(state) { if (state is VocabUiState.Empty) selecting = false }
+    BackHandler(enabled = selecting) { selecting = false; selected = emptySet() }
 
     LaunchedEffect(Unit) { viewModel.messages.collect { snackbar.showSnackbar(it) } }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            val n = (state as? VocabUiState.Content)?.items?.size ?: 0
-            CabeceraSimple("Vocabulario", onBack, subtitulo = if (n == 1) "1 palabra guardada" else "$n palabras guardadas")
+            val n = allWords.size
+            if (selecting) {
+                CabeceraSimple(
+                    if (selected.isEmpty()) "Selecciona palabras" else "${selected.size} seleccionadas",
+                    onBack = { selecting = false; selected = emptySet() },
+                    subtitulo = "Toca las palabras para marcarlas",
+                    acciones = {
+                        IconoCabecera(Icons.Filled.SelectAll, if (selected.size == n) "Quitar selección" else "Seleccionar todas") {
+                            selected = if (selected.size == n) emptySet() else allWords.map { it.id }.toSet()
+                        }
+                        if (selected.isNotEmpty()) IconoCabecera(Icons.Filled.Delete, "Borrar seleccionadas") { confirmMany = true }
+                    },
+                )
+            } else {
+                CabeceraSimple(
+                    "Vocabulario", onBack,
+                    subtitulo = if (n == 1) "1 palabra guardada" else "$n palabras guardadas",
+                    acciones = {
+                        if (n > 0) IconoCabecera(Icons.Filled.Checklist, "Seleccionar palabras") { selecting = true }
+                    },
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
@@ -78,14 +119,32 @@ fun VocabScreen(viewModel: VocabViewModel, onBack: () -> Unit, onOpenTranscripti
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(s.items, key = { it.id }) { item ->
-                        TarjetaPanel(Modifier.fillMaxWidth()) {
+                        val isSelected = item.id in selected
+                        TarjetaPanel(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).combinedClickable(
+                                onClick = {
+                                    if (selecting) selected = if (isSelected) selected - item.id else selected + item.id
+                                },
+                                onLongClick = { selecting = true; selected = selected + item.id },
+                            ),
+                            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                            borderColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                        ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(item.palabra, Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                                IconButton(onClick = { editing = item }) {
-                                    Icon(Icons.Filled.Edit, "Editar nota", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (selecting) {
+                                    Checkbox(
+                                        checked = isSelected,
+                                        onCheckedChange = { selected = if (it) selected + item.id else selected - item.id },
+                                    )
                                 }
-                                IconButton(onClick = { deleting = item }) {
-                                    Icon(Icons.Filled.Delete, "Borrar palabra", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(item.palabra, Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                                if (!selecting) {
+                                    IconButton(onClick = { editing = item }) {
+                                        Icon(Icons.Filled.Edit, "Editar nota", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    IconButton(onClick = { deleting = item }) {
+                                        Icon(Icons.Filled.Delete, "Borrar palabra", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
                                 }
                             }
                             Text(
@@ -103,8 +162,10 @@ fun VocabScreen(viewModel: VocabViewModel, onBack: () -> Unit, onOpenTranscripti
                                     item.tituloOrigen, Modifier.weight(1f), fontSize = 11.sp, maxLines = 1,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                TextButton(onClick = { abrirUrl(context, urlDiccionario(item.palabra)) }) { Text("Diccionario") }
-                                TextButton(onClick = { onOpenTranscription(item.transcriptionId) }) { Text("Ir al audio") }
+                                if (!selecting) {
+                                    TextButton(onClick = { abrirUrl(context, urlDiccionario(item.palabra)) }) { Text("Diccionario") }
+                                    TextButton(onClick = { onOpenTranscription(item.transcriptionId) }) { Text("Ir al audio") }
+                                }
                             }
                         }
                     }
@@ -118,6 +179,22 @@ fun VocabScreen(viewModel: VocabViewModel, onBack: () -> Unit, onOpenTranscripti
             titulo = item.palabra, inicial = item.nota, etiqueta = "Traducción o nota", minLines = 2,
             onConfirm = { viewModel.updateNote(item, it); editing = null },
             onDismiss = { editing = null },
+        )
+    }
+    if (confirmMany) {
+        AlertDialog(
+            onDismissRequest = { confirmMany = false },
+            title = { Text("Borrar palabras") },
+            text = { Text(if (selected.size == 1) "¿Quitar 1 palabra del vocabulario?" else "¿Quitar ${selected.size} palabras del vocabulario? Esta acción no se puede deshacer.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteMany(selected)
+                    confirmMany = false
+                    selecting = false
+                    selected = emptySet()
+                }) { Text("Borrar") }
+            },
+            dismissButton = { TextButton(onClick = { confirmMany = false }) { Text("Cancelar") } },
         )
     }
     deleting?.let { item ->
